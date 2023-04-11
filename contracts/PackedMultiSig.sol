@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
-contract EfficientMultiSig {
+contract PackedMultiSig {
     event Deposit(address indexed sender, uint256 amount, uint256 balance);
     event SubmitTransaction(
         bytes32 indexed dataHash,
@@ -13,9 +13,9 @@ contract EfficientMultiSig {
     event RevokeConfirmation(bytes32 indexed dataHash, address signer);
     event ExecuteTransaction(bytes32 indexed dataHash, address signer);
 
-    uint8 public constant MAX_SIGNERS = 2 ** 8 - 1;
+    uint8 public constant MAX_SIGNERS = 64;
 
-    mapping(address => bool) public signers;
+    mapping(uint256 => address) public signers;
     uint8 public threshold;
 
     // prettier-ignore
@@ -26,14 +26,16 @@ contract EfficientMultiSig {
         // NOTE: submitter is not counted as a confirmation, so we can save a storage slot
         uint8 confirmationsExceptSubmitter; // slot2
         bool executed;                      // slot2
-        mapping(address => bool) isConfirmed;
+        // NOTE: packed bools to save storage slots
+        // one bit correspond to one signer
+        uint64 packedIsConfirmed;           // slot2
     }
 
     // mapping from dataHash => Transaction
     mapping(bytes32 => Transaction) public transactions;
 
-    modifier onlySigner() {
-        require(signers[msg.sender], "not signer");
+    modifier onlySigner(uint256 id) {
+        require(signers[id] == msg.sender, "not signer");
         _;
     }
 
@@ -45,12 +47,15 @@ contract EfficientMultiSig {
             "invalid number of required confirmations"
         );
 
-        for (uint i = 0; i < numSigners; i++) {
+        for (uint256 i = 0; i < numSigners; i++) {
             address signer = _signers[i];
             require(signer != address(0), "invalid signer");
-            require(!signers[signer], "signer not unique");
+            // NOTE: omit checks to save gas
+            // for (uint256 j = 0; i < i; j++) {
+            //     require(signers[j] != signer, "signer not unique");
+            // }
 
-            signers[signer] = true;
+            signers[i] = signer;
         }
 
         threshold = _threshold;
@@ -61,16 +66,17 @@ contract EfficientMultiSig {
     }
 
     function submitTransaction(
+        uint256 signerId,
         address _to,
         uint256 _value,
         bytes32 dataHash
-    ) public onlySigner {
+    ) public onlySigner(signerId) {
         Transaction storage t = transactions[dataHash];
         require(t.to == address(0), "already tx registerd");
         require(_to != address(0), "invalid to address");
 
         t.to = _to;
-        t.isConfirmed[msg.sender] = true;
+        t.packedIsConfirmed |= uint64(1 << signerId);
         if (0 < _value) {
             t.value = _value;
         }
@@ -78,7 +84,10 @@ contract EfficientMultiSig {
         emit SubmitTransaction(dataHash, msg.sender, _to, _value);
     }
 
-    function confirmTransaction(bytes32 dataHash) public onlySigner {
+    function confirmTransaction(
+        uint256 signerId,
+        bytes32 dataHash
+    ) public onlySigner(signerId) {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
@@ -87,16 +96,17 @@ contract EfficientMultiSig {
         unchecked {
             t.confirmationsExceptSubmitter++;
         }
-        t.isConfirmed[msg.sender] = true;
+        t.packedIsConfirmed |= uint64(1 << signerId);
 
         emit ConfirmTransaction(dataHash, msg.sender);
     }
 
     function executeTransaction(
+        uint256 signerId,
         bytes32 dataHash,
         uint256 salt,
         bytes calldata data
-    ) public onlySigner {
+    ) public onlySigner(signerId) {
         Transaction storage t = transactions[dataHash];
         require(t.to != address(0), "tx not registerd");
         require(!t.executed, "tx already executed");
@@ -110,7 +120,7 @@ contract EfficientMultiSig {
             // increment as for submitter confirmation
             numConfirmations++;
         }
-        if (!t.isConfirmed[msg.sender]) {
+        if ((t.packedIsConfirmed >> signerId) & 1 == 0) {
             unchecked {
                 // increment as for executer confirmation
                 numConfirmations++;
@@ -126,7 +136,10 @@ contract EfficientMultiSig {
         emit ExecuteTransaction(dataHash, msg.sender);
     }
 
-    function revokeConfirmation(bytes32 dataHash) public onlySigner {
+    function revokeConfirmation(
+        uint256 signerId,
+        bytes32 dataHash
+    ) public onlySigner(signerId) {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
@@ -138,7 +151,7 @@ contract EfficientMultiSig {
             t.confirmationsExceptSubmitter--;
         }
 
-        t.isConfirmed[msg.sender] = false;
+        t.packedIsConfirmed ^= uint64(1 << signerId);
 
         emit RevokeConfirmation(dataHash, msg.sender);
     }
