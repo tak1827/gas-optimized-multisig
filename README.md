@@ -8,3 +8,7 @@ Gas optimized solidity multisig contract
 |  ganache |  ^v7.x  |
 |  prettier  |  ^v2.x  |
 |  eslint  |  ^v8.x  |
+
+
+- MultiSigWallet
+  - [Multi-Sig Wallet](https://solidity-by-example.org/app/multi-sig-wallet/)
