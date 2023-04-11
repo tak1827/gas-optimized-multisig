@@ -147,6 +147,7 @@ contract EfficientMultiSig {
     }
 
     function hashOfCalldata(bytes calldata data, uint256 salt) public pure returns (bytes32) {
+        // NOTE: Don't record salt in anywhere to save gas
         return keccak256(abi.encodePacked(salt, data));
     }
 }
