@@ -82,7 +82,7 @@ contract EfficientMultiSig {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
-        // require(!t.isConfirmed[msg.sender], "already confirmed");
+        require(!t.isConfirmed[msg.sender], "already confirmed");
 
         unchecked {
             t.confirmationsExceptSubmitter++;
@@ -130,11 +130,9 @@ contract EfficientMultiSig {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
-        // require(t.isConfirmed[msg.sender], "not yet confirmed");
+        require(t.isConfirmed[msg.sender], "not yet confirmed");
 
         unchecked {
-            // prevent underflow
-            require(0 < t.confirmationsExceptSubmitter, "underflow");
             t.confirmationsExceptSubmitter--;
         }
 

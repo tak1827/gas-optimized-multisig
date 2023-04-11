@@ -91,7 +91,7 @@ contract PackedMultiSig {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
-        // require(!t.isConfirmed[msg.sender], "already confirmed");
+        require(!_isConfirmed(t.packedIsConfirmed, signerId), "already confirmed");
 
         unchecked {
             t.confirmationsExceptSubmitter++;
@@ -120,7 +120,7 @@ contract PackedMultiSig {
             // increment as for submitter confirmation
             numConfirmations++;
         }
-        if ((t.packedIsConfirmed >> signerId) & 1 == 0) {
+        if (!_isConfirmed(t.packedIsConfirmed, signerId)) {
             unchecked {
                 // increment as for executer confirmation
                 numConfirmations++;
@@ -143,7 +143,7 @@ contract PackedMultiSig {
         Transaction storage t = transactions[dataHash];
         // NOTE: omit checks to save gas
         // require(t.to != address(0), "tx not registerd");
-        // require(t.isConfirmed[msg.sender], "not yet confirmed");
+        require(_isConfirmed(t.packedIsConfirmed, signerId), "not yet confirmed");
 
         unchecked {
             // prevent underflow
@@ -159,5 +159,9 @@ contract PackedMultiSig {
     function hashOfCalldata(bytes calldata data, uint256 salt) public pure returns (bytes32) {
         // NOTE: Don't record salt in anywhere to save gas
         return keccak256(abi.encodePacked(salt, data));
+    }
+
+    function _isConfirmed(uint64 map, uint256 index) internal pure returns (bool) {
+        return (map >> index) & 1 == 1;
     }
 }
