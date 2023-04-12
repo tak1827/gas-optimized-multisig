@@ -115,10 +115,8 @@ contract PackedMultiSig {
         unchecked {
             // increment as for submitter confirmation
             numConfirmations++;
-        }
-        if (!_isConfirmed(t.packedIsConfirmed, signerId)) {
-            unchecked {
-                // increment as for executer confirmation
+            // increment as for executer confirmation
+            if (!_isConfirmed(t.packedIsConfirmed, signerId)) {
                 numConfirmations++;
             }
         }

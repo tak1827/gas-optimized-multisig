@@ -102,10 +102,8 @@ contract EfficientMultiSig {
         unchecked {
             // increment as for submitter confirmation
             numConfirmations++;
-        }
-        if (!t.isConfirmed[msg.sender]) {
-            unchecked {
-                // increment as for executer confirmation
+            // increment as for executer confirmation
+            if (!t.isConfirmed[msg.sender]) {
                 numConfirmations++;
             }
         }
