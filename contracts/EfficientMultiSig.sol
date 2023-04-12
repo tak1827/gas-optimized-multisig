@@ -111,8 +111,18 @@ contract EfficientMultiSig {
 
         t.executed = true;
 
-        (bool success, ) = t.to.call{value: t.value}(data);
-        require(success, "tx failed");
+        (bool success, bytes memory returndata) = t.to.call{value: t.value}(data);
+
+        // revert on failure
+        if (!success) {
+            if (returndata.length > 0) {
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            }
+            revert("call reverted without message");
+        }
 
         emit ExecuteTransaction(dataHash, msg.sender);
     }
