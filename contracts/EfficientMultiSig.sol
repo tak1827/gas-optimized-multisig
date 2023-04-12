@@ -124,7 +124,10 @@ contract EfficientMultiSig {
         require(t.isConfirmed[msg.sender], "not yet confirmed");
 
         unchecked {
-            t.confirmationsExceptSubmitter--;
+            // prevent underflow
+            if (0 < t.confirmationsExceptSubmitter) {
+                t.confirmationsExceptSubmitter--;
+            }
         }
 
         t.isConfirmed[msg.sender] = false;

@@ -141,8 +141,9 @@ contract PackedMultiSig {
 
         unchecked {
             // prevent underflow
-            require(0 < t.confirmationsExceptSubmitter, "underflow");
-            t.confirmationsExceptSubmitter--;
+            if (0 < t.confirmationsExceptSubmitter) {
+                t.confirmationsExceptSubmitter--;
+            }
         }
 
         t.packedIsConfirmed ^= uint64(1 << signerId);
