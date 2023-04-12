@@ -103,17 +103,13 @@ contract PackedMultiSig {
 
     function executeTransaction(
         uint256 signerId,
-        bytes32 dataHash,
-        uint256 salt,
-        bytes calldata data
+        bytes calldata data,
+        uint256 salt
     ) public onlySigner(signerId) {
+        bytes32 dataHash = hashOfCalldata(data, salt);
         Transaction storage t = transactions[dataHash];
         require(t.to != address(0), "tx not registerd");
         require(!t.executed, "tx already executed");
-        require(
-            dataHash == hashOfCalldata(data, salt),
-            "hash of data doesn't match with dataHash"
-        );
 
         uint8 numConfirmations = t.confirmationsExceptSubmitter;
         unchecked {

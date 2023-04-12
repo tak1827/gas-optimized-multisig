@@ -53,14 +53,14 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
         let hash = await eMultiSig.hashOfCalldata(abiEncodedCall, i);
         receipt1 = await eMultiSig.submitTransaction(calculator.address, 0, hash, { from: signer1 });
         receipt2 = await eMultiSig.confirmTransaction(hash, { from: signer2 });
-        receipt3 = await eMultiSig.executeTransaction(hash, i, abiEncodedCall, { from: signer3 });
+        receipt3 = await eMultiSig.executeTransaction(abiEncodedCall, i, { from: signer3 });
         eReceipts.push(receipt1.receipt.gasUsed + receipt2.receipt.gasUsed + receipt3.receipt.gasUsed);
 
         // PackedMultiSig
         hash = await pMultiSig.hashOfCalldata(abiEncodedCall, i);
         receipt1 = await pMultiSig.submitTransaction(0, calculator.address, 0, hash, { from: signer1 });
         receipt2 = await pMultiSig.confirmTransaction(1, hash, { from: signer2 });
-        receipt3 = await pMultiSig.executeTransaction(2, hash, i, abiEncodedCall, { from: signer3 });
+        receipt3 = await pMultiSig.executeTransaction(2, abiEncodedCall, i, { from: signer3 });
         pReceipts.push(receipt1.receipt.gasUsed + receipt2.receipt.gasUsed + receipt3.receipt.gasUsed);
       }
 
