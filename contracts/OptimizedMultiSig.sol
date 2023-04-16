@@ -5,6 +5,7 @@ import "./interfaces/IMultiSig.sol";
 
 interface IOptimizedMultiSig {
     error NotSigner();
+    error CallReverted();
 }
 
 contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
@@ -16,17 +17,24 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
     // bytes4(keccak256(bytes("NotSigner()")))
     uint256 private constant _NOT_SIGNER_ERROR_SELECTOR = 0xa1b035c8;
 
-    // `keccak256(bytes("SubmitTransaction(bytes32,address,address,uint256)"))`
+    // bytes4(keccak256(bytes("CallReverted()")))
+    uint256 private constant _CALL_REVERTED_ERROR_SELECTOR = 0xbbdf0a77;
+
+    // keccak256(bytes("SubmitTransaction(bytes32,address,address,uint256)"))
     uint256 private constant _SUBMIT_TRANSACTION_EVENT_SIGNATURE =
         0x4c2b7a22120886ab21c2ef83154c2f390195940c810ecd83e34d20ae40e5a258;
 
-    // `keccak256(bytes("ConfirmTransaction(bytes32,address)"))`
+    // keccak256(bytes("ConfirmTransaction(bytes32,address)"))
     uint256 private constant _CONFIRM_TRANSACTION_EVENT_SIGNATURE =
         0xa47d9f442cc6084b9450cb0dbb468004f8e623af095e2721be63672bf2c195f8;
 
-    // `keccak256(bytes("ExecuteTransaction(bytes32,address)"))`
+    // keccak256(bytes("ExecuteTransaction(bytes32,address)"))
     uint256 private constant _EXECUTE_TRANSACTION_EVENT_SIGNATURE =
         0xb30ecae06719355aa9c20486764865e442bc528793017fd7cff935712e8ae28f;
+
+    // keccak256(bytes("RevokeConfirmation(bytes32,address,address,uint256)"))
+    uint256 private constant _REVOKE_CONFIRMATION_EVENT_SIGNATURE =
+        0xb4e0aa9b29534c5b03fb0511f0fd4c50e4693e5f7960645234e4c3f709f931cb;
 
     // prettier-ignore
     struct Transaction {
@@ -89,11 +97,11 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
         assembly {
             // Emit the `SubmitTransaction` event.
-            let slot := mload(0x80)
-            mstore(add(slot, 0x0c), shl(0x60, caller()))
-            mstore(add(slot, 0x2c), shl(0x60, _to))
-            mstore(add(slot, 0x40), _value)
-            log2(slot, 0x60, _EXECUTE_TRANSACTION_EVENT_SIGNATURE, dataHash)
+            let ptr := mload(0x40)
+            mstore(add(ptr, 0x0c), shl(0x60, caller()))
+            mstore(add(ptr, 0x2c), shl(0x60, _to))
+            mstore(add(ptr, 0x40), _value)
+            log2(ptr, 0x60, _EXECUTE_TRANSACTION_EVENT_SIGNATURE, dataHash)
         }
     }
 
@@ -111,9 +119,9 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
         assembly {
             // Emit the `ConfirmTransaction` event.
-            let slot := mload(0x80)
-            mstore(add(slot, 0x0c), shl(0x60, caller()))
-            log2(slot, 0x20, _CONFIRM_TRANSACTION_EVENT_SIGNATURE, dataHash)
+            let ptr := mload(0x40)
+            mstore(add(ptr, 0x0c), shl(0x60, caller()))
+            log2(ptr, 0x20, _CONFIRM_TRANSACTION_EVENT_SIGNATURE, dataHash)
         }
     }
 
@@ -122,15 +130,16 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
         // inline `hashOfCalldata` and optimize it using assembly
         bytes32 dataHash;
+        uint256 ptr;
         assembly {
-            let dataHashPtr := mload(0x40)
-            mstore(dataHashPtr, salt)
-            calldatacopy(add(dataHashPtr, 0x20), data.offset, data.length)
-            dataHash := keccak256(dataHashPtr, add(data.length, 0x20))
+            ptr := mload(0x40) // Get free memory pointer
+            mstore(0x40, add(ptr, add(data.length, 0x20))) // update free memory pointer
+            mstore(ptr, salt)
+            calldatacopy(add(ptr, 0x20), data.offset, data.length)
+            dataHash := keccak256(ptr, add(data.length, 0x20))
         }
 
         Transaction storage t = transactions[dataHash];
-        // Transaction storage t = _transactions(dataHash);
         require(t.to != address(0), "tx not registerd");
         require(!t.executed, "tx already executed");
 
@@ -147,24 +156,25 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
         t.executed = true;
 
-        (bool success, bytes memory returndata) = t.to.call{value: t.value}(data);
-
-        // revert on failure
-        if (!success) {
-            if (returndata.length > 0) {
-                assembly {
-                    let returndata_size := mload(returndata)
-                    revert(add(32, returndata), returndata_size)
+        address to = t.to;
+        uint256 value = t.value;
+        assembly {
+            // If the `call` fails, revert.
+            if iszero(call(gas(), to, value, add(ptr, 0x20), data.length, 0x00, 0x00)) {
+                switch returndatasize()
+                case 0 {
+                    mstore(0x00, _CALL_REVERTED_ERROR_SELECTOR)
+                    revert(0x1c, 0x04)
+                }
+                default {
+                    returndatacopy(0x00, 0x00, returndatasize())
+                    revert(0x00, returndatasize())
                 }
             }
-            revert("call reverted without message");
-        }
 
-        assembly {
             // Emit the `ExecuteTransaction` event.
-            let slot := mload(0x80)
-            mstore(add(slot, 0x0c), shl(0x60, caller()))
-            log2(slot, 0x20, _EXECUTE_TRANSACTION_EVENT_SIGNATURE, dataHash)
+            mstore(add(ptr, 0x0c), shl(0x60, caller()))
+            log2(ptr, 0x20, _EXECUTE_TRANSACTION_EVENT_SIGNATURE, dataHash)
         }
     }
 
@@ -184,7 +194,12 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
         t.packedIsConfirmed ^= uint64(1 << signerId);
 
-        emit RevokeConfirmation(dataHash, msg.sender);
+        assembly {
+            // Emit the `RevokeConfirmation` event.
+            let ptr := mload(0x40)
+            mstore(add(ptr, 0x0c), shl(0x60, caller()))
+            log2(ptr, 0x20, _REVOKE_CONFIRMATION_EVENT_SIGNATURE, dataHash)
+        }
     }
 
     function hashOfCalldata(bytes calldata data, uint256 salt) public pure returns (bytes32) {
@@ -198,9 +213,9 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
 
     function _onlySigner(uint256 id) internal view {
         assembly {
+            // NOTE: The following code is equivalent to `require(signer == msg.sender, "not signer");`
             mstore(0x00, id)
             mstore(0x20, signers.slot)
-            // require(signer == msg.sender, "not signer");
             if iszero(eq(sload(keccak256(0x00, 0x40)), caller())) {
                 mstore(0x00, _NOT_SIGNER_ERROR_SELECTOR)
                 revert(0x1c, 0x04)
@@ -208,24 +223,19 @@ contract OptimizedMultiSig is IMultiSig, IOptimizedMultiSig {
         }
     }
 
-    function _transactions(bytes32 dataHash) internal view returns (Transaction storage t) {
-        // Transaction storage t = transactions[dataHash];
-        assembly {
-            mstore(0x00, dataHash)
-            mstore(0x20, transactions.slot)
-            t.slot := sload(keccak256(0x00, 0x40))
-            // // require(signer == msg.sender, "not signer");
-            // if iszero(eq(sload(keccak256(0x00, 0x40)), caller())) {
-            //     mstore(0x00, "0xa1b035c8") // NotSigner.selector
-            //     revert(0x00, 0x04)
-            // }
-        }
-    }
+    // function _transactions(bytes32 dataHash) internal view returns (Transaction storage t) {
+    //     // Transaction storage t = transactions[dataHash];
+    //     assembly {
+    //         mstore(0x00, dataHash)
+    //         mstore(0x20, transactions.slot)
+    //         t.slot := sload(keccak256(0x00, 0x40))
+    //     }
+    // }
 
-    function _revert(bytes4 errorSelector) internal pure {
-        assembly {
-            mstore(0x00, errorSelector)
-            revert(0x00, 0x04)
-        }
-    }
+    // function _revert(bytes4 errorSelector) internal pure {
+    //     assembly {
+    //         mstore(0x00, errorSelector)
+    //         revert(0x00, 0x04)
+    //     }
+    // }
 }

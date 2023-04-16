@@ -10,7 +10,7 @@ const Calculator = artifacts.require("Calculator");
 // 0x26fa9f1a6568b42e29b1787c403B3628dFC0C6FE
 const PRI_KEY = "8179ce3d00ac1d1d1d38e4f038de00ccd0e0375517164ac5448e3acc847acb34";
 
-contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
+contract("MultiSig", function ([_, signer1, signer2, signer3, signer4]) {
   let sMultiSig;
   let eMultiSig;
   let pMultiSig;
@@ -77,16 +77,13 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
 
       // print gas cost
       for (let i = 0; i < executeCount; i++) {
-        // const rRate =
-        //   Math.round(((rReceipts[i].receipt.gasUsed - oReceipts[i].receipt.gasUsed) / rReceipts[i].receipt.gasUsed) * 100000) /
-        //   1000;
-        // const sRate =
-        //   Math.round(((sReceipts[i].receipt.gasUsed - oReceipts[i].receipt.gasUsed) / sReceipts[i].receipt.gasUsed) * 100000) /
-        //   1000;
+        const sRate = Math.round(((sReceipts[i] - oReceipts[i]) / sReceipts[i]) * 100000) / 1000;
+        const eRate = Math.round(((eReceipts[i] - oReceipts[i]) / eReceipts[i]) * 100000) / 1000;
+        const pRate = Math.round(((pReceipts[i] - oReceipts[i]) / pReceipts[i]) * 100000) / 1000;
 
         // prettier-ignore
         console.log(
-          `[${i + 1}th] standard: ${sReceipts[i]}, efficient: ${eReceipts[i]}, packed: ${pReceipts[i]}, optimized: ${oReceipts[i]} robust/optimized: x%, simple/optimized: x%`
+          `[${i + 1}th] standard: ${sReceipts[i]}, efficient: ${eReceipts[i]}, packed: ${pReceipts[i]}, optimized: ${oReceipts[i]} standard/optimized: ${sRate}%, efficient/optimized: ${eRate}%, packed/optimized: ${pRate}%`
         );
       }
     });
