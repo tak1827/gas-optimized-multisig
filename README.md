@@ -40,6 +40,6 @@ function sum(uint256 a, uint256 b) public pure returns (uint256) {
 
 | Times  | Standard | Efficient | Packed | Optimized | Standard/Optimized | Efficient/Optimized | Packed/Optimized |
 | -- | -- | -- | -- | -- | -- | -- | -- |
-|1|429605 gas|165912 gas|120239 gas|120239 gas|7.151 %|1.971 %|1.971 %|
-|2|412553 gas|165948 gas|120275 gas|120239 gas|10.181 %|2.866 %|1.971 %|
-|3|412553 gas|165948 gas|120275 gas|120239 gas|10.181 %|2.866 %|1.971 %|
+|1|429605 gas|165912 gas|120239 gas|119984 gas|7.151 %|1.971 %|1.971 %|
+|2|412553 gas|165948 gas|120275 gas|120020 gas|10.181 %|2.866 %|1.971 %|
+|3|412553 gas|165948 gas|120275 gas|120020 gas|10.181 %|2.866 %|1.971 %|
