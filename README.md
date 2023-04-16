@@ -15,14 +15,14 @@ A experlimental gas optimized solidity multisig contract
 - The multisig allows for approval of a lightweight `pure` function call.
 
 #### Contract Types
-1. `StandardMultiSig.sol`
-  - This is a standard multisig contract that is presented as an example implementation on the Solidity official [website](https://solidity-by-example.org/app/multi-sig-wallet/).
-2. `EfficientMultiSig.osl`
-  - This is an gas efficient multisig contract, developed based on the `StandardMultiSig`
-3. `PackedMultiSig.sol`
-  - This contract is similar to `EfficientMultiSig`, but it is more gas efficient due to the packing of the Transaction struct. The confirmations flag map has been changed to a bitmap
-4. `OptimizedMultiSig`
-  - This is a gas-optimized contract that utilizes inline assembly, developed based on the `PackedMultiSig`."
+1. [StandardMultiSig.sol](./contracts/StandardMultiSig.sol)
+    - This is a standard multisig contract that is presented as an example implementation on the Solidity official [website](https://solidity-by-example.org/app/multi-sig-wallet/).
+2. [EfficientMultiSig.osl](./contracts/EfficientMultiSig.sol)
+    - This is an gas efficient multisig contract, developed based on the `StandardMultiSig`
+3. [PackedMultiSig.sol](./contracts/PackedMultiSig.sol)
+    - This contract is similar to `EfficientMultiSig`, but it is more gas efficient due to the packing of the Transaction struct. The confirmations flag map has been changed to a bitmap
+4. [OptimizedMultiSig](./contracts/OptimizedMultiSig.sol)
+    - This is a gas-optimized contract that utilizes inline assembly, developed based on the `PackedMultiSig`."
 
 #### Allowed Function
 Sum of two arguments:
@@ -39,7 +39,7 @@ function sum(uint256 a, uint256 b) public pure returns (uint256) {
 - Present both the total amount of gas used and the reduction in gas consumption.
 
 | Times  | Standard | Efficient | Packed | Optimized | Standard/Optimized | Efficient/Optimized | Packed/Optimized |
-| -- | -- | -- | -- | -- | -- |
+| -- | -- | -- | -- | -- | -- | -- | -- |
 |1|429605 gas|165912 gas|120239 gas|120239 gas|7.151 %|1.971 %|1.971 %|
 |2|412553 gas|165948 gas|120275 gas|120239 gas|10.181 %|2.866 %|1.971 %|
 |3|412553 gas|165948 gas|120275 gas|120239 gas|10.181 %|2.866 %|1.971 %|
