@@ -4,6 +4,7 @@
 const StandardMultiSig = artifacts.require("StandardMultiSig");
 const EfficientMultiSig = artifacts.require("EfficientMultiSig");
 const PackedMultiSig = artifacts.require("PackedMultiSig");
+const OptimizedMultiSig = artifacts.require("OptimizedMultiSig");
 const Calculator = artifacts.require("Calculator");
 
 // 0x26fa9f1a6568b42e29b1787c403B3628dFC0C6FE
@@ -13,6 +14,7 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
   let sMultiSig;
   let eMultiSig;
   let pMultiSig;
+  let oMultiSig;
   let calculator;
   const signers = [signer1, signer2, signer3, signer4];
   const threshold = 3;
@@ -22,6 +24,7 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
     sMultiSig = await StandardMultiSig.new(signers, threshold);
     eMultiSig = await EfficientMultiSig.new(signers, threshold);
     pMultiSig = await PackedMultiSig.new(signers, threshold);
+    oMultiSig = await OptimizedMultiSig.new(signers, threshold);
     calculator = await Calculator.new();
   });
 
@@ -34,6 +37,7 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
       const sReceipts = [];
       const eReceipts = [];
       const pReceipts = [];
+      const oReceipts = [];
       for (let i = 0; i < executeCount; i++) {
         // StandardMultiSig
         let receipt1 = await sMultiSig.submitTransaction(calculator.address, 0, abiEncodedCall, { from: signer1 });
@@ -62,6 +66,13 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
         receipt2 = await pMultiSig.confirmTransaction(1, hash, { from: signer2 });
         receipt3 = await pMultiSig.executeTransaction(2, abiEncodedCall, i, { from: signer3 });
         pReceipts.push(receipt1.receipt.gasUsed + receipt2.receipt.gasUsed + receipt3.receipt.gasUsed);
+
+        // OptimizedMultiSig
+        hash = await oMultiSig.hashOfCalldata(abiEncodedCall, i);
+        receipt1 = await oMultiSig.submitTransaction(0, calculator.address, 0, hash, { from: signer1 });
+        receipt2 = await oMultiSig.confirmTransaction(1, hash, { from: signer2 });
+        receipt3 = await oMultiSig.executeTransaction(2, abiEncodedCall, i, { from: signer3 });
+        oReceipts.push(receipt1.receipt.gasUsed + receipt2.receipt.gasUsed + receipt3.receipt.gasUsed);
       }
 
       // print gas cost
@@ -75,7 +86,7 @@ contract("MultiSig", function ([deployer, signer1, signer2, signer3, signer4]) {
 
         // prettier-ignore
         console.log(
-          `[${i + 1}th] standard: ${sReceipts[i]}, efficient: ${eReceipts[i]}, more efficient: ${pReceipts[i]}, robust/optimized: x%, simple/optimized: x%`
+          `[${i + 1}th] standard: ${sReceipts[i]}, efficient: ${eReceipts[i]}, packed: ${pReceipts[i]}, optimized: ${oReceipts[i]} robust/optimized: x%, simple/optimized: x%`
         );
       }
     });
